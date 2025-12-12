@@ -1,0 +1,268 @@
+
+<!doctype html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DataSeed — Gerador de Massa de Dados</title>
+  <meta name="description" content="DataSeed: Portal profissional de geração de massa de dados para QA e Devs." />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><circle cx=%2250%22 cy=%2250%22 r=%2240%22 fill=%22%2322c55e="stylesheet"dy>
+    <!-- CSS principal — caminho absoluto é mais seguro -->
+    <link rel="stylesheet" href="style.css">
+    <!-- Background visual -->
+  <div class="bg-aurora"></div>
+  <div class="bg-grid"></div>
+
+  <!-- Navbar -->
+  <nav class="navbar">
+    <div class="nav-left">
+      <div class="logo">
+        <!-- Logo SVG -->
+        <svg width="28" height="28" viewBox="0 0 64 64" aria-label="Logo DataSeed">
+          <defs>
+            <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#22c55e"/>
+              <stop offset="100%" stop-color="#38bdf8"/>
+            </linearGradient>
+          </defs>
+          <circle cx="32" cy="32" r="28" fill="url(#g)" opacity="0.18"/>
+          <path d="M20 42c6-2 12-14 16-22l8 10c-6 6-9 17-20 16-3 0-5-1-4-4z" fill="url(#g)" />
+        </svg>
+        <span>DataSeed</span>
+      </div>
+      <button id="themeToggle" class="btn ghost" aria-label="Alternar tema">🌗</button>
+    </div>
+    <div class="nav-right">
+      #docsDocumentação</a>
+      https://#Portal da Qualidade</a>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <header class="hero">
+    <div class="hero-content">
+      <h1>DataSeed</h1>
+      <p>Gerador de massa de dados robusto para <strong>QA</strong> e <strong>Dev</strong>, com perfis <em>PF/PJ</em>, validação realista e exportações prontas.</p>
+      <div class="hero-actions">
+        #appUsar agora</a>
+        <button id="copyCurl" class="btn">Copiar exemplo cURL</button>
+      </div>
+      <div class="trust">
+        <span class="badge">Sem autenticação</span>
+        <span class="badge">CSV/JSON</span>
+        <span class="badge">Locale pt-BR</span>
+        <span class="badge">Servidor Puma</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main App -->
+  <main id="app" class="container">
+    <!-- Painel de Configuração -->
+
+      <section class="panel">
+          <div class="panel-header">
+              <h2>Configuração de Geração</h2>
+              <span class="tag">v1.0</span>
+          </div>
+
+          <!-- Tabs -->
+          <div class="tabs">
+              <button class="tab active" data-tab="simple">Simples</button>
+              <button class="tab" data-tab="advanced">Avançado</button>
+          </div>
+
+          <!-- Conteúdo das tabs -->
+          <div class="tab-content active" id="tab-simple">
+              <div class="grid">
+                  <!-- campos da aba Simples -->
+                  <div class="field">
+                      <label for="segment">Segmento</label>
+                      <select id="segment">
+                          <option value="pf">Pessoa Física (pf)</option>
+                          <option value="pj">Pessoa Jurídica (pj)</option>
+                          <option value="endereco">Endereço (BR)</option>
+                          <option value="contato">Contato</option>
+                          <option value="produto">Produto</option>
+                          <option value="cliente">Cliente</option>
+                          <option value="pedido">Pedido</option>
+                          <option value="transacao">Transação</option>
+                          <option value="cartao">Cartão</option>
+                          <option value="endereco_internacional">Endereço Internacional</option>
+                      </select>
+                  </div>
+
+                  <div class="field">
+                      <label for="count">Quantidade</label>
+                      <input id="count" type="number" min="1" max="100" value="10" />
+                  </div>
+
+                  <div class="field">
+                      <label for="format">Formato</label>
+                      <select id="format">
+                          <option value="json">JSON</option>
+                          <option value="csv">CSV</option>
+                      </select>
+                  </div>
+
+
+                  <div class="field">
+                      <label for="locale">Locale</label>
+                      <!-- Remova o value e use placeholder -->
+                      <input id="locale" type="text" placeholder="pt-BR (padrão) · en · es · fr" list="locales" />
+                      <small>Deixe vazio para usar <code>pt-BR</code>.</small>
+
+                      <!-- Datalist com sugestões de locale -->
+                      <datalist id="locales">
+                          <option value="pt-BR"></option>
+                          <option value="en"></option>
+                          <option value="es"></option>
+                          <option value="fr"></option>
+                          <option value="de"></option>
+                      </datalist>
+                  </div>
+
+                  <div class="field">
+                      <label for="apiBase">API Base URL</label>
+                      <input id="apiBase" type="text" placeholder="ex.: http://localhost:9292" />
+                  </div>
+              </div>
+          </div>
+
+          <div class="tab-content" id="tab-advanced">
+              <div class="grid">
+                  <!-- campos da aba Avançado -->
+                  <div class="field">
+                      <label for="seed">Seed</label>
+                      <input id="seed" type="number" placeholder="Opcional — reprodutibilidade" />
+                  </div>
+                  <div class="field">
+                      <label for="fieldsFilter">Filtro de campos</label>
+                      <input id="fieldsFilter" type="text" placeholder="ex.: -endereco,-telefone" />
+                  </div>
+
+                  <div class="field">
+                      <label for="count">Quantidade</label>
+                      <input id="count" type="number" min="1" max="50" value="10" />
+                      <small>Esta quantidade é independente da aba Simples.</small>
+                  </div>
+
+                  <div class="field">
+                      <label for="includeFields">Include (server-side)</label>
+                      <input id="includeFields" type="text" placeholder="ex.: nome,email,telefone,endereco.cep" />
+                      <small>Mantém apenas os campos listados; aceita dot notation.</small>
+                  </div>
+                  <div class="field">
+                      <label for="excludeFields">Exclude (server-side)</label>
+                      <input id="excludeFields" type="text" placeholder="ex.: endereco,telefone,endereco.cep" />
+                      <small>Remove campos do objeto retornado; aceita dot notation.</small>
+                  </div>
+              </div>
+          </div>
+
+          <!-- 🔥 AQUI: ações fora das tabs (sempre visíveis) -->
+          <div class="actions">
+              <button id="btnGenerate" class="btn primary">Gerar dados</button>
+              <button id="btnDownloadCsv" class="btn">Baixar CSV</button>
+              <button id="btnHealth" class="btn ghost">Health</button>
+              <button id="btnCopyJson" class="btn ghost">Copiar JSON</button>
+          </div>
+      </section>
+
+    <!-- Resultado -->
+    <section class="panel">
+      <div class="panel-header">
+        <h2>Resultado</h2>
+        <div class="inline">
+          <span id="status" class="status">Aguardando…</span>
+        </div>
+      </div>
+
+      <!-- Skeleton -->
+      <div id="skeleton" class="skeleton hidden">
+        <div class="sk-row"></div>
+        <div class="sk-row"></div>
+        <div class="sk-row"></div>
+      </div>
+
+      <!-- Output -->
+      <div class="output-wrap">
+        <pre id="output" class="output" aria-live="polite"></pre>
+      </div>
+    </section>
+
+    <!-- Destaques -->
+    <section class="features">
+      <div class="feature-card">
+        <h3>Perfis Realistas</h3>
+        <p>PF e PJ com CPF/CNPJ válidos, endereços, e contatos para testes robustos.</p>
+      </div>
+      <div class="feature-card">
+        <h3>Exportação Flexível</h3>
+        <p>Baixe CSV ou consuma JSON em pipelines e suites de automação.</p>
+      </div>
+      <div class="feature-card">
+        <h3>Configuração Simples</h3>
+        <p>Sem login. URLs claras, parâmetros intuitivos e documentação embutida.</p>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer corporativo -->
+  <footer class="footer">
+    <div class="footer-grid">
+      <div>
+        <div class="logo">
+          <svg width="22" height="22" viewBox="0 0 64 64"><defs><linearGradient id="g2" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#22c55e"/><stop offset="100%" stop-color="#38bdf8"/></linearGradient></defs><circle cx="32" cy="32" r="28" fill="url(#g2)" opacity="0.18"/><path d="M20 42c6-2 12-14 16-22l8 10c-6 6-9 17-20 16-3 0-5-1-4-4z" fill="url(#g2)" /></svg>
+          <span>DataSeed</span>
+        </div>
+        <small>© 2025 · Todos os dados gerados são fictícios para uso em testes.</small>
+      </div>
+      <div>
+        <h4>Recursos</h4>
+        <ul>
+          <li>#docsDocumentação</a></li>
+          <li>#Guia de Integração</a></li>
+          <li>#Boas Práticas QA</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Contato</h4>
+        <ul>
+          <li>mailto:rsi.dchagas@bv.com.br</a></li>
+          <li>#Portal Interno</a></li>
+        </ul>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Toasts -->
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+
+  <!-- Modal Documentação -->
+  <div id="docsModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="docsTitle">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="docsTitle">Documentação — DataSeed</h3>
+        <button id="closeDocs" class="btn ghost">✖</button>
+      </div>
+      <div class="modal-body">
+        <p><strong>Endpoint</strong>: <code>/generate</code></p>
+        <ul>
+          <li><code>segment</code>: <code>pf</code> | <code>pj</code> | <code>endereco</code> | <code>contato</code></li>
+          <li><code>count</code>: número de registros (1..MAX_COUNT)</li>
+          <li><code>format</code>: <code>json</code> | <code>csv</code></li>
+          <li><code>locale</code>: padrão <code>pt-BR</code></li>
+          <li><code>seed</code>: (opcional) reprodutibilidade</li>
+        </ul>
+        <p><strong>Exemplo</strong>:</p>
+        <pre>GET /generate?segment=pf&amp;count=10&amp;format=json&amp;locale=pt-BR</pre>
+      </div>
+      <div class="modal-actions">
+        <button id="closeDocs2" class="btn primary">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
