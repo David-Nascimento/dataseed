@@ -1,0 +1,44 @@
+# --- Ruby & Bundler ---
+/.bundle/
+/vendor/bundle/
+/lib/bundler/man/
+
+# --- Logs e Arquivos Temporários ---
+/log/*
+/tmp/*
+!/log/.keep
+!/tmp/.keep
+
+# --- Variáveis de Ambiente e Segredos (CRÍTICO) ---
+# Jamais suba arquivos .env com seus tokens reais
+.env
+.env.local
+.env.development
+.env.test
+
+# --- Arquivos do Sistema Operacional ---
+.DS_Store
+Thumbs.db
+*~
+*.swp
+
+# --- IDEs e Editores ---
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# --- Docker ---
+# Ignora sobrescritas locais do docker-compose se houver
+docker-compose.override.yml
+
+# --- ARTEFATOS GERADOS PELO DATAFORGE ---
+# Isso impede que os arquivos que você baixa/gera
+# (CSV, SQL, JSON) sejam commitados sem querer.
+*.csv
+*.sql
+*.json
+
+# Exceção: Não ignorar arquivos JSON de configuração (se houver no futuro)
+!package.json
+!manifest.json
