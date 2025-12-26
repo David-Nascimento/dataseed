@@ -1,6 +1,6 @@
 source "https://rubygems.org"
 
-ruby "~> 3.3"
+ruby "~> 3.1"
 
 gem "sinatra", require: "sinatra/base"
 gem "puma"
