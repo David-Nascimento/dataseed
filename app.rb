@@ -360,6 +360,11 @@ class DataSeed < Sinatra::Base
 
   # ---------------- Rotas ----------------
   get "/" do
+    content_type "text/html"
+    send_file File.join(settings.public_folder, "index.html")
+  end
+  
+  get "/api" do
     {
       nome: "DataSeed",
       status: "ok",
