@@ -13,4 +13,4 @@ ENV PORT=9292
 ENV MAX_COUNT=200
 
 EXPOSE 9292
-CMD ["bundle", "exec", "puma", "-p", "9292", "config.ru"]
+CMD ["bundle", "exec", "puma", "-C", "config/puma.rb"]

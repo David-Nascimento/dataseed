@@ -50,9 +50,9 @@ Suporta:
 
 ## Requisitos
 
-- **Ruby** 3.3+ (testado em `ruby 3.3.4`)
+- **Ruby** 3.1+ (testado em `3.1.7` no Windows e `3.3` no Linux)
 - **Bundler**
-- macOS/Linux (desenvolvimento local)
+- Windows, macOS ou Linux
 - (Opcional) **Docker**
 
 ---
@@ -76,7 +76,7 @@ bundle install
 ```ruby
 source "https://rubygems.org"
 
-ruby "~> 3.3"
+ruby "~> 3.1"
 
 gem "sinatra", require: "sinatra/base"
 gem "puma"
@@ -89,15 +89,19 @@ gem "csv" # compat com Ruby 3.4+ (csv deixa de ser default gem)
 
 ## Como iniciar
 
-### Opção A — `rackup` (recomendado em dev)
+### Opção A — `puma` com a config do projeto (recomendado)
 
 ```bash
-bundle exec rackup -p 9292
+bundle exec puma -C config/puma.rb
 ```
 
-*   UI: `http://localhost:9292/index.html`
+*   UI: `http://localhost:9292/`
 *   API: `http://localhost:9292/generate`
+*   Metadados: `http://localhost:9292/api`
 *   Health: `http://localhost:9292/health`
+
+A porta vem de `PORT` (padrão `9292`) e o limite de registros de `MAX_COUNT` (padrão `100`).
+No PowerShell: `$env:MAX_COUNT=500; bundle exec puma -C config/puma.rb`.
 
 ### Opção B — `puma` lendo `config.ru`
 
@@ -105,7 +109,9 @@ bundle exec rackup -p 9292
 bundle exec puma -p 9292 config.ru
 ```
 
-> **Dica**: Se você rodar `puma` sem indicar `config.ru` e estiver fora do diretório do projeto, verá `No application configured, nothing to run`. Rode na pasta correta ou indique o arquivo.
+> **Dica**: se rodar `puma` fora do diretório do projeto, verá `No application configured, nothing to run`. Rode na pasta correta ou indique o `config.ru`.
+
+> **Nota**: `rackup` não faz parte do `Gemfile` (o Rack 3 o separou em outra gem). Use um dos comandos acima.
 
 ***
 
@@ -114,10 +120,11 @@ bundle exec puma -p 9292 config.ru
     DataSeed/
     ├─ app.rb          # API + lógica de geração de dados
     ├─ config.ru       # Rack config: run DataSeed
+    ├─ config/puma.rb  # Porta e threads do Puma
     ├─ Gemfile
     └─ public/         # Front-end
        ├─ index.html
-       ├─ styles.css
+       ├─ style.css
        └─ app.js
 
 ***
@@ -139,7 +146,7 @@ end
 ```
 
 *   `MAX_COUNT`: máximo de registros por requisição (default `100`).  
-    Ajuste via env var: `MAX_COUNT=500 bundle exec rackup -p 9292`.
+    Ajuste via env var: `MAX_COUNT=500 bundle exec puma -C config/puma.rb`.
 
 ***
 
@@ -147,7 +154,11 @@ end
 
 ### `GET /`
 
-Retorna metadados da aplicação: segmentos suportados, parâmetros e limites.
+Serve a interface web (também disponível em `/ui`).
+
+### `GET /api`
+
+Retorna metadados da aplicação: segmentos suportados, parâmetros e o limite atual (`max_count`).
 
 ### `GET /health`
 
@@ -205,6 +216,8 @@ Gera e retorna a massa de dados conforme parâmetros (abaixo).
 
 *   Implementada com `Random.new(seed.to_i)` **por requisição**; `Faker::Config.random` recebe o RNG local.
 *   **Nunca** usamos `srand` (global), e sempre **resetamos** o `Faker::Config.random` em `ensure` para evitar vazamento entre chamadas.
+*   Os **UUIDs** (`id`, `id_pedido`, `cliente_id`…) e o `pan_hash` também saem do RNG da requisição, então a mesma seed reproduz o registro inteiro.
+*   Campos que dependem da data atual (`validade` do cartão, `data` do pedido) acompanham o dia em que a requisição é feita.
 
 Padrão usado em `/generate`:
 
@@ -269,28 +282,25 @@ end
 
 ## Front-end (UI)
 
-*   **Pasta**: `public/`
-    *   `index.html`: layout premium com **tabs** **Simples** / **Avançado**.
-    *   `styles.css`: dark/light theme, gradientes, glassmorphism, animações.
-    *   `app.js`: chamadas à API, preview, skeleton, toasts, **limpeza ao trocar de aba**.
-*   **Botão “Copiar JSON”**:
-    *   Visível **somente** quando `format=json` **e** aba **Simples** ativa.
-*   **Locale (placeholder)**:
-    *   `placeholder="pt-BR (padrão) · en · es · fr"`, e se vazio o front envia `pt-BR`.
+*   **Pasta**: `public/` (HTML, CSS e JS puros, sem build).
+    *   `index.html`: tela única com configuração à esquerda e resultado à direita.
+    *   `style.css`: temas claro e escuro (segue o sistema e lembra a escolha), responsivo.
+    *   `app.js`: chamadas à API, destaque de sintaxe, visão em tabela, copiar e baixar.
+*   **Tipo de dado**: cartões agrupados em *Pessoas e empresas*, *Endereços* e *Vendas e pagamentos*.
+*   **Requisição ao vivo**: a linha `GET /generate?...` no topo do resultado muda conforme o formulário e pode ser copiada como URL ou cURL.
+*   **Resultado**: aba *Resposta* (JSON com cores ou CSV bruto) e aba *Tabela* (JSON achatado, com campos aninhados em `endereco.cep`). Mostra quantidade, tamanho e tempo da resposta.
+*   **Baixar**: salva no formato escolhido. O CSV leva BOM UTF-8 para o Excel reconhecer os acentos.
+*   **Opções avançadas**: seed (com botão *Sortear*), *somente estes campos* (`include`), *remover estes campos* (`exclude`) e URL base da API.
+*   **Atalho**: `Ctrl + Enter` (ou `Cmd + Enter`) gera os dados.
+*   **Documentação**: botão no topo abre a referência da API em uma janela.
+*   O indicador *API online* consulta `/health`; o limite de registros do campo *Quantidade* vem de `/api`.
 
 Servindo a UI:
 
-*   O Sinatra serve `/public` automaticamente.
-*   Acesse: `http://localhost:9292/index.html`.
+*   O Sinatra serve `/public` automaticamente e a raiz `/` entrega o `index.html`.
+*   Acesse: `http://localhost:9292/`.
 
-> Se desejar servir a UI na raiz `/`, adicione:
-
-```ruby
-get "/" do
-  content_type "text/html"
-  send_file File.join(settings.public_folder, "index.html")
-end
-```
+> As fontes (Bricolage Grotesque, Hanken Grotesk e JetBrains Mono) vêm do Google Fonts. Sem internet, a interface usa as fontes do sistema.
 
 ***
 
@@ -372,7 +382,7 @@ ENV PORT=9292
 ENV MAX_COUNT=200
 
 EXPOSE 9292
-CMD ["bundle", "exec", "puma", "-p", "9292", "config.ru"]
+CMD ["bundle", "exec", "puma", "-C", "config/puma.rb"]
 ```
 
 Build & run:
@@ -380,7 +390,7 @@ Build & run:
 ```bash
 docker build -t dataseed:latest .
 docker run --rm -p 9292:9292 dataseed:latest
-# Acesse: http://localhost:9292/index.html
+# Acesse: http://localhost:9292/
 ```
 
 ***
@@ -411,13 +421,22 @@ bundle exec puma -C config/puma.rb
 
 ### `ERROR: No application configured, nothing to run`
 
-*   Rode `puma` fora do diretório do projeto ou sem `config.ru`.
+*   Você rodou `puma` fora do diretório do projeto ou sem indicar o `config.ru`.
 *   Solução:
     ```bash
-    bundle exec rackup -p 9292
+    bundle exec puma -C config/puma.rb
     # ou
     bundle exec puma -p 9292 config.ru
     ```
+
+### `bundler: command not found: rackup`
+
+*   O `rackup` não está no `Gemfile`. Use `bundle exec puma -C config/puma.rb`.
+
+### Erro 400 em `/generate`
+
+*   A resposta traz a causa em JSON, por exemplo `{"error": "Locale \"xx\" não é suportado..."}`.
+*   Valide `segment`, `format`, `count` (inteiro de 1 a `MAX_COUNT`), `locale` e `seed` (inteiro).
 
 ### `cannot load such file -- cpf_cnpj`
 
@@ -427,26 +446,21 @@ bundle exec puma -C config/puma.rb
 
 ### CSS não é carregado
 
-*   Estrutura:
+*   Estrutura esperada:
     public/index.html
-    public/styles.css
+    public/style.css
     public/app.js
 *   Em `app.rb`: `set :public_folder, ...` e `enable :static`.
-*   No HTML: `/styles.css`.
-*   Teste direto: `http://localhost:9292/styles.css` → deve retornar **200**.
+*   Teste direto: `http://localhost:9292/style.css` → deve retornar **200**.
 
-### Seed afetando Simples
+### A seed não repete os mesmos dados
 
-*   Corrigido: seed é **por requisição** e resetada em `ensure`.
-*   Não usar `srand`.
+*   A seed vale a partir da mesma versão do Faker. Atualizar a gem pode mudar os nomes gerados.
+*   `validade` do cartão e `data` do pedido dependem do dia atual.
 
-### Botão “Copiar JSON” exibindo fora de hora
+### As fontes parecem diferentes
 
-*   JS deve chamar `updateCopyVisibility()` ao:
-    *   trocar **aba**,
-    *   trocar **format**,
-    *   **init** da página.
-*   CSS deve ter `.hidden { display: none !important; }`.
+*   Sem acesso ao Google Fonts a interface usa as fontes do sistema. Nada quebra, só muda o visual.
 
 ***
 
@@ -469,20 +483,11 @@ Se tornar OSS, sugerimos **MIT License** com ressalva explícita de **dados fict
 
 ## Anexos (opcional)
 
-### Servir a UI em `/`
-
-```ruby
-get "/" do
-  content_type "text/html"
-  send_file File.join(settings.public_folder, "index.html")
-end
-```
-
 ### Makefile (atalhos)
 
 ```makefile
 run:
-\tbundle exec rackup -p 9292
+\tbundle exec puma -C config/puma.rb
 
 puma:
 \tbundle exec puma -p 9292 config.ru

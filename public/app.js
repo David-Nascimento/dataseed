@@ -1,343 +1,445 @@
-
-
 (function () {
-    const byId = (id) => document.getElementById(id);
+  "use strict";
 
-    const els = {
-        // actions/global
-        btnGenerate: byId("btnGenerate"),
-        btnDownloadCsv: byId("btnDownloadCsv"),
-        btnHealth: byId("btnHealth"),
-        btnCopyJson: byId("btnCopyJson"),
-        copyCurl: byId("copyCurl"),
-        themeToggle: byId("themeToggle"),
+  const $ = (sel, root = document) => root.querySelector(sel);
 
-        status: byId("status"),
-        output: byId("output"),
-        skeleton: byId("skeleton"),
-        toast: byId("toast"),
-        tabs: document.querySelectorAll(".tab"),
-        apiBaseGlobal: byId("apiBase"), // se for único fora das tabs
+  const form = $("#form");
+  const els = {
+    reqUrl: $("#reqUrl"),
+    viewport: $("#viewport"),
+    output: $("#output"),
+    tableWrap: $("#tableWrap"),
+    errorBox: $("#errorBox"),
+    errorTitle: $("#errorTitle"),
+    errorText: $("#errorText"),
+    meta: $("#meta"),
+    metaCount: $("#metaCount"),
+    metaSize: $("#metaSize"),
+    metaTime: $("#metaTime"),
+    tabJson: $("#tabJson"),
+    tabTable: $("#tabTable"),
+    btnGenerate: $("#btnGenerate"),
+    btnCopy: $("#btnCopy"),
+    btnDownload: $("#btnDownload"),
+    downloadLabel: $("#downloadLabel"),
+    count: $("#count"),
+    seed: $("#seed"),
+    apiBase: $("#apiBase"),
+    health: $("#health"),
+    healthText: $("#healthText"),
+    toast: $("#toast"),
+    docs: $("#docs"),
+  };
+
+  const state = {
+    view: "json",       // "json" | "table"
+    busy: false,
+    maxCount: 100,
+    last: null,         // { text, format, segment, data, count }
+  };
+
+  /* ---------------- utilidades ---------------- */
+
+  function store(key, value) {
+    try {
+      if (value === undefined) return localStorage.getItem(key);
+      localStorage.setItem(key, value);
+    } catch (_) { /* armazenamento indisponível: segue sem persistir */ }
+    return null;
+  }
+
+  function baseUrl() {
+    const typed = (els.apiBase.value || "").trim().replace(/\/+$/, "");
+    return typed || window.location.origin;
+  }
+
+  function formatBytes(n) {
+    if (n < 1024) return `${n} B`;
+    if (n < 1024 * 1024) return `${(n / 1024).toFixed(1).replace(".", ",")} KB`;
+    return `${(n / 1024 / 1024).toFixed(1).replace(".", ",")} MB`;
+  }
+
+  function plural(n, one, many) {
+    return `${n.toLocaleString("pt-BR")} ${n === 1 ? one : many}`;
+  }
+
+  let toastTimer;
+  function toast(message) {
+    els.toast.textContent = message;
+    els.toast.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { els.toast.hidden = true; }, 2200);
+  }
+
+  async function copyText(text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch (_) {
+      // Fallback para páginas fora de HTTPS/localhost
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      let ok = false;
+      try { ok = document.execCommand("copy"); } catch (_) { ok = false; }
+      ta.remove();
+      return ok;
+    }
+  }
+
+  /* ---------------- parâmetros e requisição ---------------- */
+
+  function collectParams() {
+    const fd = new FormData(form);
+    const params = {
+      segment: fd.get("segment"),
+      count: String(fd.get("count") || "").trim(),
+      format: fd.get("format"),
+      locale: String(fd.get("locale") || "").trim(),
+      seed: String(fd.get("seed") || "").trim(),
+      include: String(fd.get("include") || "").trim(),
+      exclude: String(fd.get("exclude") || "").trim(),
     };
+    Object.keys(params).forEach((k) => { if (params[k] === "") delete params[k]; });
+    return params;
+  }
 
-    // helpers de aba
+  function buildPath(params) {
+    // vírgulas ficam legíveis na URL (include/exclude)
+    return "/generate?" + new URLSearchParams(params).toString().replace(/%2C/gi, ",");
+  }
 
-    function activeTabName() {
-        return document.querySelector(".tab.active")?.dataset.tab || "simple"; // "simple" | "advanced"
+  function currentUrl() {
+    return baseUrl() + buildPath(collectParams());
+  }
+
+  function renderRequestLine() {
+    els.reqUrl.textContent = buildPath(collectParams());
+    const csv = collectParams().format === "csv";
+    els.downloadLabel.textContent = csv ? "Baixar CSV" : "Baixar JSON";
+  }
+
+  /* ---------------- renderização ---------------- */
+
+  function escapeHtml(s) {
+    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  const TOKEN = /("(?:\\.|[^"\\])*"(\s*:)?|\b(?:true|false|null)\b|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)/g;
+
+  function highlightJson(text) {
+    return escapeHtml(text).replace(TOKEN, (match, _all, colon) => {
+      if (match.startsWith('"')) {
+        return colon
+          ? `<span class="k">${match.slice(0, match.length - colon.length)}</span>${colon}`
+          : `<span class="s">${match}</span>`;
+      }
+      if (match === "true" || match === "false" || match === "null") return `<span class="l">${match}</span>`;
+      return `<span class="n">${match}</span>`;
+    });
+  }
+
+  function flatten(value, prefix, out) {
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      Object.keys(value).forEach((k) => flatten(value[k], prefix ? `${prefix}.${k}` : k, out));
+    } else {
+      out[prefix] = value;
     }
-    function activeTabEl() {
-        return document.getElementById(`tab-${activeTabName()}`);
-    }
-    function isAdvanced() { return activeTabName() === "advanced"; }
+    return out;
+  }
 
-        // busca elemento DENTRO da aba ativa (evita IDs duplicados)
-    function getInActiveTab(id) {
-        return activeTabEl()?.querySelector(`#${id}`) || byId(id); // fallback se for único
-    }
+  function renderTable(rows) {
+    const flat = rows.map((r) => flatten(r, "", {}));
+    const cols = [];
+    flat.forEach((r) => Object.keys(r).forEach((k) => { if (!cols.includes(k)) cols.push(k); }));
 
+    const table = document.createElement("table");
+    table.className = "data-table";
 
-    function clearResult() {
-        const statusEl = document.getElementById("status");
-        const outputEl = document.getElementById("output");
-        const skeleton = document.getElementById("skeleton");
-        const toast    = document.getElementById("toast");
-
-        if (outputEl) outputEl.textContent = "";
-        if (statusEl) { statusEl.textContent = "Aguardando…"; statusEl.style.color = "var(--accent)"; }
-        if (skeleton) skeleton.classList.add("hidden");
-        if (toast) toast.classList.add("hidden");
-    }
-
-    function clearAdvancedFields() {
-        // pega dentro da aba advanced por segurança
-        const adv = document.getElementById("tab-advanced");
-        adv?.querySelector("#seed") && (adv.querySelector("#seed").value = "");
-        adv?.querySelector("#fieldsFilter") && (adv.querySelector("#fieldsFilter").value = "");
-        adv?.querySelector("#limitDisplay") && (adv.querySelector("#limitDisplay").value = 10);
-        adv?.querySelector("#includeFields") && (adv.querySelector("#includeFields").value = "");
-        adv?.querySelector("#excludeFields") && (adv.querySelector("#excludeFields").value = "");
-    }
-
-    function updateCopyVisibility() {
-        const formatEl = getInActiveTab("format");
-        const isJson = formatEl?.value === "json";
-        const inSimple = activeTabName() === "simple";
-        els.btnCopyJson?.classList.toggle("hidden", !(isJson && inSimple));
-    }
-
-    // URL builder
-    function apiUrl(path, params = {}) {
-        const base = (els.apiBaseGlobal?.value || "").trim();
-        const url = new URL((base || window.location.origin) + path);
-        Object.entries(params).forEach(([k, v]) => {
-            if (v !== undefined && v !== null && String(v).length > 0) {
-                url.searchParams.set(k, v);
-            }
-        });
-        return url.toString();
-    }
-
-    // coleta de parâmetros somente da aba ativa
-
-    function collectParams(forceFormat) {
-        // Pega "format" e demais do container ativo (evita IDs duplicados)
-        const tabId = activeTabName() === "advanced" ? "#tab-advanced" : "#tab-simple";
-
-        const segmentEl = document.querySelector(`${tabId} #segment`) || document.getElementById("segment");
-        const countEl   = document.querySelector(`${tabId} #count`)   || document.getElementById("count");
-        const formatEl  = document.querySelector(`${tabId} #format`)  || document.getElementById("format");
-        const localeEl  = document.querySelector(`${tabId} #locale`)  || document.getElementById("locale");
-
-        const localeVal = (localeEl?.value || "").trim() || "pt-BR";
-
-        const params = {
-            mode: activeTabName(), // <- envia o modo explicitamente
-            segment: segmentEl?.value,
-            count: countEl?.value,
-            format: forceFormat || formatEl?.value || "json",
-            locale: localeVal,
-        };
-
-        if (isAdvanced()) {
-            // Só Avançado envia estes
-            const seedEl     = document.querySelector("#tab-advanced #seed");
-            const includeEl  = document.querySelector("#tab-advanced #includeFields");
-            const excludeEl  = document.querySelector("#tab-advanced #excludeFields");
-
-            const seed    = (seedEl?.value || "").trim();
-            const include = (includeEl?.value || "").trim();
-            const exclude = (excludeEl?.value || "").trim();
-
-            if (seed)   params.seed   = seed;
-            if (include) params.include = include;
-            if (exclude) params.exclude = exclude;
-        }
-
-        // Remove chave vazia
-        Object.keys(params).forEach(k => {
-            if (params[k] === undefined || params[k] === null || String(params[k]).trim() === "") {
-                delete params[k];
-            }
-        });
-
-        return params;
-    }
-
-    async function fetchJson(url) {
-        const res = await fetch(url, { headers: { "Accept": "application/json" } });
-        if (!res.ok) throw new Error(`HTTP ${res.status} — ${await res.text()}`);
-        return res.json();
-    }
-
-    function showToast(msg) {
-        if (!els.toast) return;
-        els.toast.textContent = msg;
-        els.toast.classList.remove("hidden");
-        setTimeout(() => els.toast.classList.add("hidden"), 2500);
-    }
-
-    function showSkeleton(show) {
-        els.skeleton?.classList.toggle("hidden", !show);
-        if (show) els.output && (els.output.textContent = "");
-    }
-
-    function showOutput(obj) {
-        try { els.output.textContent = typeof obj === "string" ? obj : JSON.stringify(obj, null, 2); }
-        catch { els.output.textContent = String(obj); }
-    }
-
-    // preview avançado (filtro/limite) — só advanced
-    function filterFieldsInArray(arr, filterStr) {
-        if (!filterStr) return arr;
-        const removals = filterStr.split(",").map(s => s.trim()).filter(Boolean).map(s => s.replace(/^-/, ""));
-        return arr.map(item => {
-            const copy = JSON.parse(JSON.stringify(item));
-            removals.forEach(field => { delete copy[field]; });
-            return copy;
-        });
-    }
-
-    function applyAdvancedPreview(out) {
-        if (!isAdvanced()) return out; // <- guarda aqui!
-        const filterEl = document.querySelector("#tab-advanced #fieldsFilter");
-        const limitEl  = document.querySelector("#tab-advanced #limitDisplay");
-
-        const filterStr = (filterEl?.value || "").trim();
-        const limit = parseInt((limitEl?.value || "10"), 10);
-
-        // remove campos do preview (client-side)
-        const removals = filterStr
-            .split(",").map(s => s.trim()).filter(Boolean)
-            .map(s => s.replace(/^-/, ""));
-        const filtered = (Array.isArray(out) ? out : [out]).map(item => {
-            const copy = JSON.parse(JSON.stringify(item));
-            removals.forEach(field => { delete copy[field]; });
-            return copy;
-        });
-        return Array.isArray(out) ? filtered.slice(0, limit) : filtered[0];
-    }
-
-    // actions
-    async function onGenerate() {
-        try {
-            setStatus("Gerando dados...");
-            showSkeleton(true);
-
-            const params = collectParams(); // coleta apenas da aba ativa
-            const url = apiUrl("/generate", params);
-
-            if ((params.format || "json") === "json") {
-                const data = await fetchJson(url);
-                const total = Array.isArray(data.data) ? data.data.length : 1;
-                let preview = data.data || data;
-                preview = applyAdvancedPreview(preview);
-
-                setStatus(`OK — ${total} registros`);
-                showSkeleton(false);
-                showOutput({ ...data, data: preview });
-                showToast(isAdvanced() ? "Dados gerados (preview avançado)" : "Dados gerados");
-            } else {
-                const res = await fetch(url);
-                if (!res.ok) throw new Error(`HTTP ${res.status} — ${await res.text()}`);
-                const blob = await res.blob();
-                const text = await blob.text();
-                setStatus("OK (CSV gerado)");
-                showSkeleton(false);
-                showOutput(text);
-                showToast("CSV pronto (preview). Use ‘Baixar CSV’ para download.");
-            }
-        } catch (err) {
-            console.error(err);
-            setStatus(err.message || "Erro ao gerar", true);
-            showSkeleton(false);
-            showOutput({ error: err.message });
-            showToast("Falha ao gerar");
-        }
-    }
-
-    async function onDownloadCsv() {
-        try {
-            const params = collectParams("csv"); // força CSV
-            const url = apiUrl("/generate", params);
-            const res = await fetch(url);
-            if (!res.ok) throw new Error(`HTTP ${res.status} — ${await res.text()}`);
-            const blob = await res.blob();
-            const fileName = `${params.segment}_${Date.now()}.csv`;
-
-            const a = document.createElement("a");
-            a.href = URL.createObjectURL(blob);
-            a.download = fileName;
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-
-            setStatus(`CSV baixado: ${fileName}`);
-            showToast("Download iniciado");
-        } catch (err) {
-            console.error(err);
-            setStatus(err.message || "Erro ao baixar CSV", true);
-            showOutput({ error: err.message });
-            showToast("Falha no download");
-        }
-    }
-
-    async function onHealth() {
-        try {
-            setStatus("Checando saúde...");
-            const url = apiUrl("/health");
-            const data = await fetchJson(url);
-            setStatus("OK");
-            showOutput(data);
-            showToast("Servidor saudável");
-        } catch (err) {
-            console.error(err);
-            setStatus(err.message || "Erro no health", true);
-            showOutput({ error: err.message });
-            showToast("Falha no health");
-        }
-    }
-
-    async function onCopyJson() {
-        // segurança extra: apenas Simples + JSON
-        const formatEl = getInActiveTab("format");
-        const inSimpleJson = (activeTabName() === "simple") && (formatEl?.value === "json");
-        if (!inSimpleJson) return;
-        const text = els.output?.textContent || "";
-        if (!text.trim()) { showToast("Nada para copiar"); return; }
-        try { await navigator.clipboard.writeText(text); showToast("JSON copiado"); }
-        catch { showToast("Falha ao copiar"); }
-    }
-
-    function setStatus(msg, isError = false) {
-        els.status.textContent = msg;
-        els.status.style.color = isError ? "#f87171" : "var(--accent)";
-    }
-
-
-    function setupTabs() {
-        document.querySelectorAll(".tab").forEach(btn => {
-            btn.addEventListener("click", () => {
-                // alterna ativo
-                document.querySelectorAll(".tab").forEach(b => b.classList.remove("active"));
-                btn.classList.add("active");
-                // mostra conteúdo da tab
-                document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
-                document.getElementById(`tab-${btn.dataset.tab}`)?.classList.add("active");
-
-                clearResult(); // sempre limpa ao trocar de aba
-
-                if (btn.dataset.tab === "simple") {
-                    clearAdvancedFields(); // <- zera avançado ao voltar pra Simples
-                }
-
-                updateCopyVisibility(); // botão Copiar só em Simples + JSON
-            });
-        });
-    }
-
-    // bindings
-    els.btnGenerate?.addEventListener("click", onGenerate);
-    els.btnDownloadCsv?.addEventListener("click", onDownloadCsv);
-    els.btnHealth?.addEventListener("click", onHealth);
-    els.btnCopyJson?.addEventListener("click", onCopyJson);
-
-    // copiar cURL (sempre modo simple para exemplo)
-    els.copyCurl?.addEventListener("click", async () => {
-        const base = els.apiBaseGlobal?.value || window.location.origin;
-        const url = `${base}/generate?segment=pf&count=5&format=json&locale=pt-BR&mode=simple`;
-        const cmd = `curl -s "${url}" | jq`;
-        try { await navigator.clipboard.writeText(cmd); showToast("Exemplo cURL copiado"); }
-        catch { showToast("Falha ao copiar cURL"); }
+    const head = table.createTHead().insertRow();
+    const th0 = document.createElement("th");
+    th0.className = "row-n";
+    th0.textContent = "#";
+    head.appendChild(th0);
+    cols.forEach((c) => {
+      const th = document.createElement("th");
+      th.scope = "col";
+      th.textContent = c;
+      head.appendChild(th);
     });
 
-    // toggle tema
-    els.themeToggle?.addEventListener("click", () => {
-        const html = document.documentElement;
-        const next = (html.getAttribute("data-theme") || "dark") === "dark" ? "light" : "dark";
-        html.setAttribute("data-theme", next);
-        showToast(`Tema: ${next}`);
+    const body = table.createTBody();
+    flat.forEach((row, i) => {
+      const tr = body.insertRow();
+      const n = tr.insertCell();
+      n.className = "row-n";
+      n.textContent = String(i + 1);
+      cols.forEach((c) => {
+        const td = tr.insertCell();
+        const v = row[c];
+        if (v === null || v === undefined) {
+          td.textContent = "null";
+          td.className = "is-null";
+        } else if (typeof v === "object") {
+          td.textContent = JSON.stringify(v);
+          td.title = td.textContent;
+        } else {
+          td.textContent = String(v);
+          td.title = td.textContent;
+          if (typeof v === "number") td.className = "is-num";
+        }
+      });
     });
 
-    // mensagem contextual para CSV + visibilidade do Copiar
-    // ⚠️ importante: pegar format do container ativo
-    const formatSimple = document.querySelector("#tab-simple #format");
-    const formatAdvanced = document.querySelector("#tab-advanced #format");
-    [formatSimple, formatAdvanced].forEach(el => {
-        el?.addEventListener("change", () => {
-            if (el.value === "csv") setStatus("Formato CSV: use ‘Gerar dados’ para preview ou ‘Baixar CSV’ para download.");
-            else setStatus("Aguardando…");
-            updateCopyVisibility();
-        });
-    });
+    els.tableWrap.replaceChildren(table);
+  }
 
-    // limpar preview ao mudar campos chave
-    ["segment", "locale", "count"].forEach(id => {
-        document.querySelector(`#tab-simple #${id}`)?.addEventListener("change", clearResult);
-        document.querySelector(`#tab-advanced #${id}`)?.addEventListener("change", clearResult);
-    });
+  function applyView() {
+    const csv = state.last && state.last.format === "csv";
+    els.tabTable.setAttribute("aria-disabled", csv ? "true" : "false");
+    els.tabTable.title = csv ? "A visão em tabela está disponível para JSON" : "";
+    if (csv && state.view === "table") state.view = "json";
 
-    // init
-    setupTabs();
-    updateCopyVisibility();
-    setStatus("Aguardando…");
+    const showTable = state.view === "table" && state.last && state.last.data;
+    els.viewport.dataset.view = showTable ? "table" : "json";
+    els.tabJson.setAttribute("aria-selected", String(!showTable));
+    els.tabTable.setAttribute("aria-selected", String(!!showTable));
+    els.output.hidden = !!showTable;
+    els.tableWrap.hidden = !showTable;
+    els.errorBox.hidden = true;
+  }
+
+  function showResult(result, ms) {
+    state.last = result;
+
+    if (result.format === "json") {
+      els.output.innerHTML = highlightJson(result.text);
+      renderTable(result.data.data || []);
+    } else {
+      els.output.textContent = result.text;
+      els.tableWrap.replaceChildren();
+    }
+
+    els.metaCount.textContent = plural(result.count, "registro", "registros");
+    els.metaSize.textContent = formatBytes(new Blob([result.text]).size);
+    els.metaTime.textContent = `${ms} ms`;
+    els.meta.hidden = false;
+    els.btnCopy.disabled = false;
+    els.btnDownload.disabled = false;
+    els.viewport.scrollTop = 0;
+    applyView();
+  }
+
+  function showError(title, message) {
+    state.last = null;
+    els.errorTitle.textContent = title;
+    els.errorText.textContent = message;
+    els.output.hidden = true;
+    els.tableWrap.hidden = true;
+    els.errorBox.hidden = false;
+    els.meta.hidden = true;
+    els.btnCopy.disabled = true;
+    els.btnDownload.disabled = true;
+    els.viewport.dataset.view = "json";
+  }
+
+  /* ---------------- geração ---------------- */
+
+  function apiMessage(text) {
+    try {
+      const parsed = JSON.parse(text);
+      if (parsed && parsed.error) return parsed.error;
+    } catch (_) { /* resposta não é JSON */ }
+    return null;
+  }
+
+  async function generate() {
+    if (state.busy) return;
+    const params = collectParams();
+    const url = baseUrl() + buildPath(params);
+
+    state.busy = true;
+    els.btnGenerate.disabled = true;
+    els.viewport.dataset.state = "loading";
+    const started = performance.now();
+
+    try {
+      const res = await fetch(url, { headers: { Accept: params.format === "csv" ? "text/csv" : "application/json" } });
+      const text = await res.text();
+      const ms = Math.round(performance.now() - started);
+
+      if (!res.ok) {
+        const message = apiMessage(text);
+        showError(
+          message ? "O servidor recusou o pedido" : `Erro ${res.status} no servidor`,
+          message || "Verifique os parâmetros e tente novamente."
+        );
+        return;
+      }
+
+      if (params.format === "csv") {
+        const lines = text.replace(/\r?\n$/, "").split(/\r?\n/);
+        showResult({ text, format: "csv", segment: params.segment, data: null, count: Math.max(lines.length - 1, 0) }, ms);
+      } else {
+        const data = JSON.parse(text);
+        showResult({ text: JSON.stringify(data, null, 2), format: "json", segment: params.segment, data, count: data.count }, ms);
+      }
+    } catch (err) {
+      showError(
+        "Não foi possível falar com a API",
+        `Confira se o servidor está rodando em ${baseUrl()} e tente de novo.`
+      );
+      setHealth(false);
+    } finally {
+      state.busy = false;
+      els.btnGenerate.disabled = false;
+      els.viewport.dataset.state = "idle";
+    }
+  }
+
+  /* ---------------- saúde da API e limites ---------------- */
+
+  function setHealth(ok) {
+    els.health.dataset.state = ok ? "ok" : "down";
+    els.healthText.textContent = ok ? "API online" : "API offline";
+  }
+
+  async function checkHealth() {
+    els.health.dataset.state = "checking";
+    els.healthText.textContent = "Verificando API";
+    try {
+      const res = await fetch(baseUrl() + "/health", { cache: "no-store" });
+      setHealth(res.ok);
+    } catch (_) {
+      setHealth(false);
+    }
+  }
+
+  async function loadLimits() {
+    try {
+      const res = await fetch(baseUrl() + "/api", { cache: "no-store" });
+      if (!res.ok) return;
+      const info = await res.json();
+      if (Number.isInteger(info.max_count) && info.max_count > 0) {
+        state.maxCount = info.max_count;
+        els.count.max = String(info.max_count);
+        document.querySelectorAll("[data-max-count]").forEach((n) => { n.textContent = String(info.max_count); });
+        clampCount();
+        renderRequestLine();
+      }
+    } catch (_) { /* mantém o limite padrão */ }
+  }
+
+  /* ---------------- quantidade ---------------- */
+
+  function clampCount() {
+    let n = parseInt(els.count.value, 10);
+    if (Number.isNaN(n)) n = 10;
+    els.count.value = String(Math.min(Math.max(n, 1), state.maxCount));
+  }
+
+  function stepCount(delta) {
+    const n = parseInt(els.count.value, 10) || 1;
+    els.count.value = String(n + delta);
+    clampCount();
+    renderRequestLine();
+  }
+
+  /* ---------------- ações ---------------- */
+
+  async function copyOutput() {
+    if (!state.last) return;
+    toast((await copyText(state.last.text)) ? "Resultado copiado" : "Não foi possível copiar");
+  }
+
+  function download() {
+    if (!state.last) return;
+    const { text, format, segment } = state.last;
+    const isCsv = format === "csv";
+    // BOM no CSV para o Excel reconhecer os acentos
+    const blob = new Blob([isCsv ? "\uFEFF" + text : text], {
+      type: isCsv ? "text/csv;charset=utf-8" : "application/json;charset=utf-8",
+    });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${segment}_${Date.now()}.${isCsv ? "csv" : "json"}`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    toast(`Arquivo ${isCsv ? "CSV" : "JSON"} baixado`);
+  }
+
+  function setTheme(next) {
+    document.documentElement.setAttribute("data-theme", next);
+    store("dataseed-theme", next);
+  }
+
+  /* ---------------- eventos ---------------- */
+
+  form.addEventListener("submit", (e) => { e.preventDefault(); clampCount(); renderRequestLine(); generate(); });
+  form.addEventListener("input", renderRequestLine);
+  form.addEventListener("change", renderRequestLine);
+
+  document.addEventListener("keydown", (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+      e.preventDefault();
+      form.requestSubmit();
+    }
+  });
+
+  els.count.addEventListener("blur", () => { clampCount(); renderRequestLine(); });
+  $("#countDown").addEventListener("click", () => stepCount(-1));
+  $("#countUp").addEventListener("click", () => stepCount(1));
+
+  // seed: aceita apenas inteiros
+  els.seed.addEventListener("input", () => {
+    els.seed.value = els.seed.value.replace(/(?!^-)[^0-9]/g, "");
+  });
+  $("#seedRandom").addEventListener("click", () => {
+    els.seed.value = String(Math.floor(Math.random() * 999999) + 1);
+    renderRequestLine();
+  });
+
+  els.tabJson.addEventListener("click", () => { state.view = "json"; applyView(); });
+  els.tabTable.addEventListener("click", () => {
+    if (els.tabTable.getAttribute("aria-disabled") === "true") return;
+    state.view = "table";
+    applyView();
+  });
+
+  els.btnCopy.addEventListener("click", copyOutput);
+  els.btnDownload.addEventListener("click", download);
+  $("#btnRetry").addEventListener("click", generate);
+
+  $("#copyUrl").addEventListener("click", async () => {
+    toast((await copyText(currentUrl())) ? "URL copiada" : "Não foi possível copiar");
+  });
+  $("#copyCurl").addEventListener("click", async () => {
+    toast((await copyText(`curl -s "${currentUrl()}"`)) ? "Comando cURL copiado" : "Não foi possível copiar");
+  });
+
+  els.health.addEventListener("click", checkHealth);
+  els.apiBase.addEventListener("change", () => { checkHealth(); loadLimits(); });
+  $("#themeToggle").addEventListener("click", () => {
+    setTheme(document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark");
+  });
+
+  // documentação
+  $("#btnDocs").addEventListener("click", () => els.docs.showModal());
+  $("#closeDocs").addEventListener("click", () => els.docs.close());
+  els.docs.addEventListener("click", (e) => { if (e.target === els.docs) els.docs.close(); });
+
+  /* ---------------- inicialização ---------------- */
+
+  renderRequestLine();
+  els.btnCopy.disabled = true;
+  els.btnDownload.disabled = true;
+  checkHealth();
+  loadLimits();
+  generate(); // a primeira tela já mostra dados reais
 })();

@@ -1,266 +1,287 @@
-
 <!doctype html>
-<html lang="pt-BR" data-theme="dark">
+<html lang="pt-BR" data-theme="light">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>DataSeed — Gerador de Massa de Dados</title>
-  <meta name="description" content="DataSeed: Portal profissional de geração de massa de dados para QA e Devs." />
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><circle cx=%2250%22 cy=%2250%22 r=%2240%22 fill=%22%2322c55e="stylesheet"dy>
-    <!-- CSS principal — caminho absoluto é mais seguro -->
-    <link rel="stylesheet" href="style.css">
-    <!-- Background visual -->
-  <div class="bg-aurora"></div>
-  <div class="bg-grid"></div>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DataSeed — Gerador de massa de dados</title>
+  <meta name="description" content="DataSeed gera dados fictícios e realistas (CPF, CNPJ, pedidos, cartões e mais) em JSON ou CSV para testes de QA e desenvolvimento.">
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234F46E5'/%3E%3Cpath d='M16 25V14' stroke='white' stroke-width='2.4' stroke-linecap='round'/%3E%3Cpath d='M16 15c0-4 2.8-6.5 7-6.5 0 4-2.6 6.5-7 6.5Z' fill='white'/%3E%3Cpath d='M16 18.5c0-3-2.2-5-5.5-5 0 3 2 5 5.5 5Z' fill='%23C7CBFF'/%3E%3C/svg%3E">
 
-  <!-- Navbar -->
-  <nav class="navbar">
-    <div class="nav-left">
-      <div class="logo">
-        <!-- Logo SVG -->
-        <svg width="28" height="28" viewBox="0 0 64 64" aria-label="Logo DataSeed">
-          <defs>
-            <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0%" stop-color="#22c55e"/>
-              <stop offset="100%" stop-color="#38bdf8"/>
-            </linearGradient>
-          </defs>
-          <circle cx="32" cy="32" r="28" fill="url(#g)" opacity="0.18"/>
-          <path d="M20 42c6-2 12-14 16-22l8 10c-6 6-9 17-20 16-3 0-5-1-4-4z" fill="url(#g)" />
-        </svg>
-        <span>DataSeed</span>
-      </div>
-      <button id="themeToggle" class="btn ghost" aria-label="Alternar tema">🌗</button>
-    </div>
-    <div class="nav-right">
-      <a href="https://github.com/David-Nascimento/dataseed/blob/master/README.md" target="_blank" rel="noopener noreferrer" class="link">Documentação</a>
-    </div>
-  </nav>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Hanken+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" href="style.css">
+  <script>
+    // Aplica o tema salvo antes da primeira pintura (evita "piscar")
+    (function () {
+      try {
+        var saved = localStorage.getItem("dataseed-theme");
+        var dark = saved ? saved === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
+        document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+      } catch (e) {}
+    })();
+  </script>
+</head>
+<body>
+  <a class="skip-link" href="#workbench">Ir para o gerador</a>
 
-  <!-- Hero -->
-  <header class="hero">
-    <div class="hero-content">
-      <h1>DataSeed</h1>
-      <p>Gerador de massa de dados robusto para <strong>QA</strong> e <strong>Dev</strong>, com perfis <em>PF/PJ</em>, validação realista e exportações prontas.</p>
-      <div class="hero-actions">
-        #appUsar agora</a>
-        <button id="copyCurl" class="btn">Copiar exemplo cURL</button>
-      </div>
-      <div class="trust">
-        <span class="badge">Sem autenticação</span>
-        <span class="badge">CSV/JSON</span>
-        <span class="badge">Locale pt-BR</span>
-        <span class="badge">Servidor Puma</span>
-      </div>
-    </div>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="DataSeed, página inicial">
+      <svg class="brand-mark" width="30" height="30" viewBox="0 0 32 32" aria-hidden="true">
+        <rect width="32" height="32" rx="8" fill="currentColor"/>
+        <path d="M16 25V14" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/>
+        <path d="M16 15c0-4 2.8-6.5 7-6.5 0 4-2.6 6.5-7 6.5Z" fill="#fff"/>
+        <path d="M16 18.5c0-3-2.2-5-5.5-5 0 3 2 5 5.5 5Z" fill="#C7CBFF"/>
+      </svg>
+      <span class="brand-name">DataSeed</span>
+    </a>
+
+    <nav class="topnav" aria-label="Principal">
+      <button type="button" class="link-btn" id="btnDocs">Documentação</button>
+      <a class="link-btn" href="https://github.com/David-Nascimento/dataseed" target="_blank" rel="noopener noreferrer">GitHub</a>
+      <button type="button" class="health" id="health" data-state="checking" title="Verificar a API novamente">
+        <span class="health-dot" aria-hidden="true"></span>
+        <span id="healthText">Verificando API</span>
+      </button>
+      <button type="button" class="icon-btn" id="themeToggle" aria-label="Alternar entre tema claro e escuro" title="Alternar tema">
+        <svg class="icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z"/></svg>
+        <svg class="icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+      </button>
+    </nav>
   </header>
 
-  <!-- Main App -->
-  <main id="app" class="container">
-    <!-- Painel de Configuração -->
+  <main id="workbench" class="workbench">
+    <!-- ================= Configuração ================= -->
+    <form id="form" class="panel config" autocomplete="off" novalidate>
+      <div class="config-scroll">
+        <header class="config-intro">
+          <h1>Gerador de massa de dados</h1>
+          <p>Escolha o tipo de dado, defina a quantidade e receba JSON ou CSV prontos para seus testes.</p>
+        </header>
 
-      <section class="panel">
-          <div class="panel-header">
-              <h2>Configuração de Geração</h2>
-              <span class="tag">v1.0</span>
+        <fieldset class="field-group">
+          <legend class="group-title">O que gerar</legend>
+
+          <p class="subgroup-title" id="g-pessoas">Pessoas e empresas</p>
+          <div class="chips" role="radiogroup" aria-labelledby="g-pessoas">
+            <label class="chip"><input type="radio" name="segment" value="pf" checked>
+              <span class="chip-body"><span class="chip-title">Pessoa física</span><span class="chip-desc">Nome, CPF, e-mail e endereço</span></span></label>
+            <label class="chip"><input type="radio" name="segment" value="pj">
+              <span class="chip-body"><span class="chip-title">Pessoa jurídica</span><span class="chip-desc">Razão social, CNPJ e IE</span></span></label>
+            <label class="chip"><input type="radio" name="segment" value="contato">
+              <span class="chip-body"><span class="chip-title">Contato</span><span class="chip-desc">Nome, e-mail e telefone</span></span></label>
+            <label class="chip"><input type="radio" name="segment" value="cliente">
+              <span class="chip-body"><span class="chip-title">Cliente</span><span class="chip-desc">Pessoa com score e limite</span></span></label>
           </div>
 
-          <!-- Tabs -->
-          <div class="tabs">
-              <button class="tab active" data-tab="simple">Simples</button>
-              <button class="tab" data-tab="advanced">Avançado</button>
+          <p class="subgroup-title" id="g-enderecos">Endereços</p>
+          <div class="chips" role="radiogroup" aria-labelledby="g-enderecos">
+            <label class="chip"><input type="radio" name="segment" value="endereco">
+              <span class="chip-body"><span class="chip-title">Endereço</span><span class="chip-desc">Brasileiro, com CEP e UF</span></span></label>
+            <label class="chip"><input type="radio" name="segment" value="endereco_internacional">
+              <span class="chip-body"><span class="chip-title">Endereço internacional</span><span class="chip-desc">Formato do idioma escolhido</span></span></label>
           </div>
 
-          <!-- Conteúdo das tabs -->
-          <div class="tab-content active" id="tab-simple">
-              <div class="grid">
-                  <!-- campos da aba Simples -->
-                  <div class="field">
-                      <label for="segment">Segmento</label>
-                      <select id="segment">
-                          <option value="pf">Pessoa Física (pf)</option>
-                          <option value="pj">Pessoa Jurídica (pj)</option>
-                          <option value="endereco">Endereço (BR)</option>
-                          <option value="contato">Contato</option>
-                          <option value="produto">Produto</option>
-                          <option value="cliente">Cliente</option>
-                          <option value="pedido">Pedido</option>
-                          <option value="transacao">Transação</option>
-                          <option value="cartao">Cartão</option>
-                          <option value="endereco_internacional">Endereço Internacional</option>
-                      </select>
-                  </div>
+          <p class="subgroup-title" id="g-vendas">Vendas e pagamentos</p>
+          <div class="chips" role="radiogroup" aria-labelledby="g-vendas">
+            <label class="chip"><input type="radio" name="segment" value="produto">
+              <span class="chip-body"><span class="chip-title">Produto</span><span class="chip-desc">SKU, preço e estoque</span></span></label>
+            <label class="chip"><input type="radio" name="segment" value="pedido">
+              <span class="chip-body"><span class="chip-title">Pedido</span><span class="chip-desc">Itens, subtotais e total</span></span></label>
+            <label class="chip"><input type="radio" name="segment" value="transacao">
+              <span class="chip-body"><span class="chip-title">Transação</span><span class="chip-desc">Cartão, Pix ou boleto</span></span></label>
+            <label class="chip"><input type="radio" name="segment" value="cartao">
+              <span class="chip-body"><span class="chip-title">Cartão</span><span class="chip-desc">PAN válido, bandeira e CVV</span></span></label>
+          </div>
+        </fieldset>
 
-                  <div class="field">
-                      <label for="count">Quantidade</label>
-                      <input id="count" type="number" min="1" max="100" value="10" />
-                  </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="count">Quantidade</label>
+            <div class="stepper">
+              <button type="button" class="stepper-btn" id="countDown" aria-label="Diminuir quantidade">−</button>
+              <input id="count" name="count" type="number" inputmode="numeric" min="1" max="100" value="10">
+              <button type="button" class="stepper-btn" id="countUp" aria-label="Aumentar quantidade">+</button>
+            </div>
+          </div>
 
-                  <div class="field">
-                      <label for="format">Formato</label>
-                      <select id="format">
-                          <option value="json">JSON</option>
-                          <option value="csv">CSV</option>
-                      </select>
-                  </div>
+          <div class="field">
+            <span class="label" id="formatLabel">Formato</span>
+            <div class="segmented" role="radiogroup" aria-labelledby="formatLabel">
+              <label><input type="radio" name="format" value="json" checked><span>JSON</span></label>
+              <label><input type="radio" name="format" value="csv"><span>CSV</span></label>
+            </div>
+          </div>
+        </div>
 
+        <div class="field">
+          <label for="locale">Idioma dos dados</label>
+          <input id="locale" name="locale" type="text" list="locales" placeholder="pt-BR (padrão)" spellcheck="false" autocapitalize="off">
+          <datalist id="locales">
+            <option value="pt-BR"></option>
+            <option value="en"></option>
+            <option value="en-US"></option>
+            <option value="es"></option>
+            <option value="fr"></option>
+            <option value="de"></option>
+            <option value="it"></option>
+          </datalist>
+          <p class="hint">Em “Endereço”, qualquer idioma diferente de pt-BR retorna o endereço internacional.</p>
+        </div>
 
-                  <div class="field">
-                      <label for="locale">Locale</label>
-                      <!-- Remova o value e use placeholder -->
-                      <input id="locale" type="text" placeholder="pt-BR (padrão) · en · es · fr" list="locales" />
-                      <small>Deixe vazio para usar <code>pt-BR</code>.</small>
+        <details class="advanced" id="advanced">
+          <summary>
+            <span>Opções avançadas</span>
+            <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+          </summary>
 
-                      <!-- Datalist com sugestões de locale -->
-                      <datalist id="locales">
-                          <option value="pt-BR"></option>
-                          <option value="en"></option>
-                          <option value="es"></option>
-                          <option value="fr"></option>
-                          <option value="de"></option>
-                      </datalist>
-                  </div>
-
-                  <div class="field">
-                      <label for="apiBase">API Base URL</label>
-                      <input id="apiBase" type="text" placeholder="ex.: http://localhost:9292" />
-                  </div>
+          <div class="advanced-body">
+            <div class="field">
+              <label for="seed">Seed</label>
+              <div class="input-action seed-field">
+                <input id="seed" name="seed" type="text" inputmode="numeric" pattern="-?[0-9]*" placeholder="Vazio: dados novos a cada vez" spellcheck="false">
+                <button type="button" class="mini-btn" id="seedRandom" title="Sortear uma seed">Sortear</button>
               </div>
+              <p class="hint">A mesma seed gera sempre os mesmos dados. Útil para reproduzir um cenário de teste.</p>
+            </div>
+
+            <div class="field">
+              <label for="includeFields">Somente estes campos</label>
+              <input id="includeFields" name="include" type="text" placeholder="nome,email,endereco.cep" spellcheck="false" autocapitalize="off">
+            </div>
+
+            <div class="field">
+              <label for="excludeFields">Remover estes campos</label>
+              <input id="excludeFields" name="exclude" type="text" placeholder="telefone,endereco.complemento" spellcheck="false" autocapitalize="off">
+              <p class="hint">Separe por vírgula e use ponto para campos aninhados. Se “somente estes campos” estiver preenchido, a remoção é ignorada.</p>
+            </div>
+
+            <div class="field">
+              <label for="apiBase">URL base da API</label>
+              <input id="apiBase" name="apiBase" type="url" placeholder="Vazio: este servidor" spellcheck="false" autocapitalize="off">
+            </div>
           </div>
+        </details>
+      </div>
 
-          <div class="tab-content" id="tab-advanced">
-              <div class="grid">
-                  <!-- campos da aba Avançado -->
-                  <div class="field">
-                      <label for="seed">Seed</label>
-                      <input id="seed" type="number" placeholder="Opcional — reprodutibilidade" />
-                  </div>
-                  <div class="field">
-                      <label for="fieldsFilter">Filtro de campos</label>
-                      <input id="fieldsFilter" type="text" placeholder="ex.: -endereco,-telefone" />
-                  </div>
+      <div class="config-actions">
+        <button type="submit" class="btn primary" id="btnGenerate" aria-keyshortcuts="Control+Enter Meta+Enter">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5Z"/></svg>
+          <span>Gerar dados</span>
+        </button>
+        <p class="shortcut">Atalho: <kbd>Ctrl</kbd> + <kbd>Enter</kbd></p>
+      </div>
+    </form>
 
-                  <div class="field">
-                      <label for="count">Quantidade</label>
-                      <input id="count" type="number" min="1" max="50" value="10" />
-                      <small>Esta quantidade é independente da aba Simples.</small>
-                  </div>
+    <!-- ================= Resultado ================= -->
+    <section class="panel result" aria-labelledby="resultTitle">
+      <h2 id="resultTitle" class="visually-hidden">Resultado</h2>
 
-                  <div class="field">
-                      <label for="includeFields">Include (server-side)</label>
-                      <input id="includeFields" type="text" placeholder="ex.: nome,email,telefone,endereco.cep" />
-                      <small>Mantém apenas os campos listados; aceita dot notation.</small>
-                  </div>
-                  <div class="field">
-                      <label for="excludeFields">Exclude (server-side)</label>
-                      <input id="excludeFields" type="text" placeholder="ex.: endereco,telefone,endereco.cep" />
-                      <small>Remove campos do objeto retornado; aceita dot notation.</small>
-                  </div>
-              </div>
-          </div>
-
-          <!-- 🔥 AQUI: ações fora das tabs (sempre visíveis) -->
-          <div class="actions">
-              <button id="btnGenerate" class="btn primary">Gerar dados</button>
-              <button id="btnDownloadCsv" class="btn">Baixar CSV</button>
-              <button id="btnHealth" class="btn ghost">Health</button>
-              <button id="btnCopyJson" class="btn ghost">Copiar JSON</button>
-          </div>
-      </section>
-
-    <!-- Resultado -->
-    <section class="panel">
-      <div class="panel-header">
-        <h2>Resultado</h2>
-        <div class="inline">
-          <span id="status" class="status">Aguardando…</span>
+      <div class="request">
+        <span class="method">GET</span>
+        <code class="request-url" id="reqUrl" tabindex="0" aria-label="Requisição que será enviada"></code>
+        <div class="request-actions">
+          <button type="button" class="mini-btn" id="copyUrl">Copiar URL</button>
+          <button type="button" class="mini-btn" id="copyCurl">Copiar cURL</button>
         </div>
       </div>
 
-      <!-- Skeleton -->
-      <div id="skeleton" class="skeleton hidden">
-        <div class="sk-row"></div>
-        <div class="sk-row"></div>
-        <div class="sk-row"></div>
+      <div class="result-bar">
+        <div class="tabs" role="tablist" aria-label="Visualização">
+          <button type="button" role="tab" class="tab" id="tabJson" aria-selected="true" aria-controls="viewport">Resposta</button>
+          <button type="button" role="tab" class="tab" id="tabTable" aria-selected="false" aria-controls="viewport">Tabela</button>
+        </div>
+
+        <dl class="meta" id="meta" hidden>
+          <div><dt class="visually-hidden">Registros</dt><dd id="metaCount"></dd></div>
+          <div><dt class="visually-hidden">Tamanho</dt><dd id="metaSize"></dd></div>
+          <div><dt class="visually-hidden">Tempo</dt><dd id="metaTime"></dd></div>
+        </dl>
+
+        <div class="result-actions">
+          <button type="button" class="mini-btn" id="btnCopy">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+            <span>Copiar</span>
+          </button>
+          <button type="button" class="mini-btn" id="btnDownload">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>
+            <span id="downloadLabel">Baixar JSON</span>
+          </button>
+        </div>
       </div>
 
-      <!-- Output -->
-      <div class="output-wrap">
-        <pre id="output" class="output" aria-live="polite"></pre>
-      </div>
-    </section>
-
-    <!-- Destaques -->
-    <section class="features">
-      <div class="feature-card">
-        <h3>Perfis Realistas</h3>
-        <p>PF e PJ com CPF/CNPJ válidos, endereços, e contatos para testes robustos.</p>
-      </div>
-      <div class="feature-card">
-        <h3>Exportação Flexível</h3>
-        <p>Baixe CSV ou consuma JSON em pipelines e suites de automação.</p>
-      </div>
-      <div class="feature-card">
-        <h3>Configuração Simples</h3>
-        <p>Sem login. URLs claras, parâmetros intuitivos e documentação embutida.</p>
+      <div class="viewport" id="viewport" data-view="json" data-state="idle" role="tabpanel" tabindex="0" aria-label="Dados gerados">
+        <div class="progress" aria-hidden="true"></div>
+        <pre class="code" id="output"></pre>
+        <div class="table-wrap" id="tableWrap" hidden></div>
+        <div class="error-box" id="errorBox" role="alert" hidden>
+          <h3 id="errorTitle"></h3>
+          <p id="errorText"></p>
+          <button type="button" class="btn" id="btnRetry">Tentar novamente</button>
+        </div>
       </div>
     </section>
   </main>
 
-  <!-- Footer corporativo -->
   <footer class="footer">
-    <div class="footer-grid">
-      <div>
-        <div class="logo">
-          <svg width="22" height="22" viewBox="0 0 64 64"><defs><linearGradient id="g2" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#22c55e"/><stop offset="100%" stop-color="#38bdf8"/></linearGradient></defs><circle cx="32" cy="32" r="28" fill="url(#g2)" opacity="0.18"/><path d="M20 42c6-2 12-14 16-22l8 10c-6 6-9 17-20 16-3 0-5-1-4-4z" fill="url(#g2)" /></svg>
-          <span>DataSeed</span>
-        </div>
-        <small>© 2025 · Todos os dados gerados são fictícios para uso em testes.</small>
-      </div>
-      <div>
-        <h4>Recursos</h4>
-        <ul>
-          <li><a href="https://github.com/David-Nascimento/dataseed/blob/master/README.md" target="_blank" rel="noopener noreferrer" class="link">Documentação</a></li>
-          <li><a href="https://github.com/David-Nascimento/dataseed" target="_blank" rel="noopener noreferrer" class="link">Repositório</a></li>
-        </ul>
-      </div>
-      <div>
-        <h4>Contato</h4>
-        <ul>
-          <li><a href="mailto:halison700@gmail.com" class="link">halison700@gmail.com</a></li>
-          <li><a href="https://github.com/David-Nascimento/dataseed" target="_blank" rel="noopener noreferrer" class="link">GitHub</a></li>
-        </ul>
-      </div>
-    </div>
+    <p>Todos os dados são fictícios. CPF, CNPJ e números de cartão seguem as regras de validação, mas não pertencem a ninguém. Use somente em ambientes de teste.</p>
+    <p><a href="mailto:halison700@gmail.com">halison700@gmail.com</a></p>
   </footer>
 
-  <!-- Toasts -->
-  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
-  <!-- Modal Documentação -->
-  <div id="docsModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="docsTitle">
-    <div class="modal-card">
-      <div class="modal-header">
-        <h3 id="docsTitle">Documentação — DataSeed</h3>
-        <button id="closeDocs" class="btn ghost">✖</button>
-      </div>
-      <div class="modal-body">
-        <p><strong>Endpoint</strong>: <code>/generate</code></p>
-        <ul>
-          <li><code>segment</code>: <code>pf</code> | <code>pj</code> | <code>endereco</code> | <code>contato</code></li>
-          <li><code>count</code>: número de registros (1..MAX_COUNT)</li>
-          <li><code>format</code>: <code>json</code> | <code>csv</code></li>
-          <li><code>locale</code>: padrão <code>pt-BR</code></li>
-          <li><code>seed</code>: (opcional) reprodutibilidade</li>
-        </ul>
-        <p><strong>Exemplo</strong>:</p>
-        <pre>GET /generate?segment=pf&amp;count=10&amp;format=json&amp;locale=pt-BR</pre>
-      </div>
-      <div class="modal-actions">
-        <button id="closeDocs2" class="btn primary">Fechar</button>
-      </div>
+  <!-- ================= Documentação ================= -->
+  <dialog id="docs" class="docs" aria-labelledby="docsTitle">
+    <div class="docs-head">
+      <h2 id="docsTitle">Documentação da API</h2>
+      <button type="button" class="icon-btn" id="closeDocs" aria-label="Fechar documentação">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
     </div>
-  </div>
+
+    <div class="docs-body">
+      <p>A interface usa a mesma API pública. Tudo o que você gera aqui também pode ser pedido por script.</p>
+
+      <h3>Endpoint</h3>
+      <pre class="snippet">GET /generate?segment=pf&amp;count=10&amp;format=json&amp;locale=pt-BR</pre>
+
+      <h3>Parâmetros</h3>
+      <div class="table-scroll">
+        <table class="doc-table">
+          <thead><tr><th>Parâmetro</th><th>Padrão</th><th>Descrição</th></tr></thead>
+          <tbody>
+            <tr><td><code>segment</code></td><td><code>pf</code></td><td>Tipo de dado: <code>pf</code>, <code>pj</code>, <code>contato</code>, <code>cliente</code>, <code>endereco</code>, <code>endereco_internacional</code> (ou <code>intl</code>), <code>produto</code>, <code>pedido</code>, <code>transacao</code>, <code>cartao</code>.</td></tr>
+            <tr><td><code>count</code></td><td><code>1</code></td><td>Quantidade de registros, de 1 a <span data-max-count>100</span>.</td></tr>
+            <tr><td><code>format</code></td><td><code>json</code></td><td><code>json</code> ou <code>csv</code>. No CSV o separador é <code>;</code> e objetos aninhados vão como JSON na célula.</td></tr>
+            <tr><td><code>locale</code></td><td><code>pt-BR</code></td><td>Idioma dos dados (<code>en</code>, <code>es</code>, <code>fr</code>, <code>de</code>…). Um idioma não suportado retorna erro 400.</td></tr>
+            <tr><td><code>seed</code></td><td>nenhum</td><td>Número inteiro. A mesma seed e os mesmos parâmetros geram os mesmos dados, incluindo os IDs.</td></tr>
+            <tr><td><code>include</code></td><td>nenhum</td><td>Mantém só os campos listados, com ponto para aninhados: <code>nome,endereco.cep</code>.</td></tr>
+            <tr><td><code>exclude</code></td><td>nenhum</td><td>Remove os campos listados. É ignorado quando <code>include</code> é usado.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Exemplos</h3>
+      <pre class="snippet">curl "http://localhost:9292/generate?segment=cliente&amp;count=5"
+
+curl "http://localhost:9292/generate?segment=pedido&amp;count=3&amp;seed=42"
+
+curl "http://localhost:9292/generate?segment=pf&amp;count=50&amp;format=csv" -o pessoas.csv
+
+curl "http://localhost:9292/generate?segment=pf&amp;include=nome,email,endereco.cep"</pre>
+
+      <h3>Outros endereços</h3>
+      <ul class="plain-list">
+        <li><code>GET /health</code> informa se o servidor está no ar.</li>
+        <li><code>GET /api</code> lista segmentos, parâmetros e o limite atual de registros.</li>
+      </ul>
+
+      <h3>Erros</h3>
+      <p>Parâmetros inválidos retornam <code>400</code> com uma mensagem em JSON, por exemplo <code>{"error": "Formato inválido. Use json ou csv."}</code>. Nenhum dado é gerado nesse caso.</p>
+    </div>
+  </dialog>
 
   <script src="app.js"></script>
 </body>
+</html>
